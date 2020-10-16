@@ -25,6 +25,7 @@
     "fastify": "3.6.0",
     "fastify-cors": "4.1.0",
     "fastify-oas": "3.0.3",
+    "fastify-websocket": "2.0.10",
     "ioredis": "4.17.3",
     "pino": "6.7.0",
     "ts-nats": "1.2.15"
