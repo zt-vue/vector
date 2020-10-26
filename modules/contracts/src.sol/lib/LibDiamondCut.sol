@@ -2,7 +2,7 @@
 pragma solidity ^0.7.1;
 pragma experimental ABIEncoderV2;
 
-import "./LibDiamondStorage.sol";
+import "./LibFacetStorage.sol";
 import "../interfaces/IDiamondCut.sol";
 
 /// @title LibDiamondCut
@@ -17,7 +17,7 @@ library LibDiamondCut {
     // The code is duplicated to prevent copying calldata to memory which
     // causes an error for a two dimensional array.
     function diamondCut(IDiamondCut.Facet[] memory _diamondCut) internal {
-        LibDiamondStorage.DiamondStorage storage ds = LibDiamondStorage.diamondStorage();
+        LibFacetStorage.DiamondStorage storage ds = LibFacetStorage.diamondStorage();
         uint256 selectorCount = ds.selectors.length;
         for (uint256 facetIndex; facetIndex < _diamondCut.length; facetIndex++) {
             selectorCount = addReplaceRemoveFacetSelectors(
@@ -34,7 +34,7 @@ library LibDiamondCut {
         address _newFacetAddress,
         bytes4[] memory _selectors
     ) internal returns (uint256) {
-        LibDiamondStorage.DiamondStorage storage ds = LibDiamondStorage.diamondStorage();
+        LibFacetStorage.DiamondStorage storage ds = LibFacetStorage.diamondStorage();
         if (_newFacetAddress != address(0)) {
             hasContractCode(_newFacetAddress, "LibDiamondCut: facet has no code");
             // add and replace selectors
@@ -43,7 +43,7 @@ library LibDiamondCut {
                 address oldFacetAddress = ds.facetAddressAndSelectorPosition[selector].facetAddress;
                 // add
                 if (oldFacetAddress == address(0)) {
-                    ds.facetAddressAndSelectorPosition[selector] = LibDiamondStorage.FacetAddressAndSelectorPosition(
+                    ds.facetAddressAndSelectorPosition[selector] = LibFacetStorage.FacetAddressAndSelectorPosition(
                         _newFacetAddress,
                         uint16(_selectorCount)
                     );
@@ -62,7 +62,7 @@ library LibDiamondCut {
             // remove functions
             for (uint256 selectorIndex; selectorIndex < _selectors.length; selectorIndex++) {
                 bytes4 selector = _selectors[selectorIndex];
-                LibDiamondStorage.FacetAddressAndSelectorPosition memory oldFacetAddressAndSelectorPosition = ds
+                LibFacetStorage.FacetAddressAndSelectorPosition memory oldFacetAddressAndSelectorPosition = ds
                     .facetAddressAndSelectorPosition[selector];
                 // if selector already does not exist then do nothing
                 if (oldFacetAddressAndSelectorPosition.facetAddress == address(0)) {

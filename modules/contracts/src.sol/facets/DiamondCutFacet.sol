@@ -3,7 +3,7 @@ pragma solidity ^0.7.1;
 pragma experimental ABIEncoderV2;
 
 import "../interfaces/IDiamondCut.sol";
-import "../lib/LibDiamondStorage.sol";
+import "../lib/LibFacetStorage.sol";
 import "../lib/LibDiamondCut.sol";
 
 /// @title DiamondCutFacet
@@ -22,7 +22,7 @@ contract DiamondCutFacet is IDiamondCut {
         address _init,
         bytes calldata _calldata
     ) external override {
-        LibDiamondStorage.DiamondStorage storage ds = LibDiamondStorage.diamondStorage();
+        LibFacetStorage.DiamondStorage storage ds = LibFacetStorage.diamondStorage();
         require(msg.sender == ds.contractOwner, "DiamondCutFacet: Must own the contract");
         uint256 selectorCount = ds.selectors.length;
         for (uint256 facetIndex; facetIndex < _diamondCut.length; facetIndex++) {

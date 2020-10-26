@@ -15,7 +15,7 @@ contract CMCCore is ReentrancyGuard, ICMCCore {
   ///         Nonzero address also prevents the mastercopy from being setup
   ///         Only setting alice is sufficient, setting bob too wouldn't change anything
   constructor () {
-      alice = invalidParticipant;
+    alice = invalidParticipant;
   }
 
   // Prevents us from calling methods directly from the mastercopy contract

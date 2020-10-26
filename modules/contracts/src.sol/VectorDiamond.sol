@@ -8,75 +8,111 @@ pragma experimental ABIEncoderV2;
 * Implementation of an example of a diamond.
 /******************************************************************************/
 
-import "./lib/LibDiamondStorage.sol";
-import "./lib/LibDiamondCut.sol";
-import "./facets/OwnershipFacet.sol";
-import "./facets/DiamondLoupeFacet.sol";
 import "./facets/DiamondCutFacet.sol";
+import "./facets/OwnershipFacet.sol";
 import "./interfaces/IDiamondCut.sol";
+import "./interfaces/IVectorChannel.sol";
+import "./lib/LibFacetStorage.sol";
+import "./lib/LibFacetStorage.sol";
+import "./lib/LibDiamondCut.sol";
+import "./ReentrancyGuard.sol";
 
-contract Diamond {
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+import "./AssetTransfer.sol";
+import "./CMCAccountant.sol";
+import "./CMCAdjudicator.sol";
+import "./CMCDeposit.sol";
+import "./CMCWithdraw.sol";
 
-    constructor(address owner) payable {
-        LibDiamondStorage.DiamondStorage storage ds = LibDiamondStorage.diamondStorage();
-        ds.contractOwner = owner;
-        emit OwnershipTransferred(address(0), owner);
+contract VectorDiamond is ReentrancyGuard {
+    address constant invalidParticipant = address(1);
 
-        DiamondCutFacet diamondCutFacet = new DiamondCutFacet();
+    address internal alice;
+    address internal bob;
 
-        DiamondLoupeFacet diamondLoupeFacet = new DiamondLoupeFacet();
+    // Prevents us from calling methods directly from the mastercopy contract
+    modifier onlyViaProxy {
+        require(alice != address(1), "Mastercopy: ONLY_VIA_PROXY");
+        _;
+    }
 
-        OwnershipFacet ownershipFacet = new OwnershipFacet();
+    /// @notice Contract constructor for Proxied copies
+    /// @param _alice: Address representing user with function deposit
+    /// @param _bob: Address representing user with multisig deposit
+    function setup(address _alice, address _bob) external onlyViaProxy {
+        ReentrancyGuard.setup();
+        require(alice == address(0), "Channel has already been setup");
+        require(_alice != address(0) && _bob != address(0), "Address zero not allowed as channel participant");
+        require(_alice != _bob, "Channel participants must be different from each other");
+        alice = _alice;
+        bob = _bob;
+    }
+
+    /// @notice A getter function for the bob of the multisig
+    /// @return Bob's signer address
+    function getAlice() external view onlyViaProxy nonReentrantView returns (address) {
+        return alice;
+    }
+
+    /// @notice A getter function for the bob of the multisig
+    /// @return Alice's signer address
+    function getBob() external view onlyViaProxy nonReentrantView returns (address) {
+        return bob;
+    }
+
+    /// @notice Set invalid participants to block the mastercopy from being used directly
+    ///         Nonzero address also prevents the mastercopy from being setup
+    ///         Only setting alice is sufficient, setting bob too wouldn't change anything
+    constructor () {
+        alice = invalidParticipant;
+
+        // LibFacetStorage.DiamondStorage storage ds = LibFacetStorage.diamondStorage();
+
+        CMCAccountant accountant = new CMCAccountant();
+
+        CMCAdjudicator adjudicator = new CMCAdjudicator();
 
         IDiamondCut.Facet[] memory diamondCut = new IDiamondCut.Facet[](3);
 
-        // adding diamondCut function
-        diamondCut[0].facetAddress = address(diamondCutFacet);
-        diamondCut[0].functionSelectors = new bytes4[](1);
-        diamondCut[0].functionSelectors[0] = DiamondCutFacet.diamondCut.selector;
+        // add CMCAccountant functions
+        diamondCut[0].facetAddress = address(accountant);
+        diamondCut[0].functionSelectors = new bytes4[](8);
+        // from AssetTransfer
+        diamondCut[0].functionSelectors[0] = AssetTransfer.getTotalTransferred.selector;
+        diamondCut[0].functionSelectors[1] = AssetTransfer.getEmergencyWithdrawableAmount.selector;
+        diamondCut[0].functionSelectors[2] = AssetTransfer.emergencyWithdraw.selector;
+        // from CMCDeposit
+        diamondCut[0].functionSelectors[3] = CMCDeposit.getTotalDepositsAlice.selector;
+        diamondCut[0].functionSelectors[4] = CMCDeposit.getTotalDepositsBob.selector;
+        diamondCut[0].functionSelectors[5] = CMCDeposit.depositAlice.selector;
+        // from CMCWithdraw
+        diamondCut[0].functionSelectors[6] = CMCWithdraw.getWithdrawalTransactionRecord.selector;
+        diamondCut[0].functionSelectors[7] = CMCWithdraw.withdraw.selector;
 
-        // adding diamond loupe functions
-        diamondCut[1].facetAddress = address(diamondLoupeFacet);
-        diamondCut[1].functionSelectors = new bytes4[](5);
-        diamondCut[1].functionSelectors[0] = DiamondLoupeFacet.facetFunctionSelectors.selector;
-        diamondCut[1].functionSelectors[1] = DiamondLoupeFacet.facets.selector;
-        diamondCut[1].functionSelectors[2] = DiamondLoupeFacet.facetAddress.selector;
-        diamondCut[1].functionSelectors[3] = DiamondLoupeFacet.facetAddresses.selector;
-        diamondCut[1].functionSelectors[4] = DiamondLoupeFacet.supportsInterface.selector;
-
-        // adding ownership functions
-        diamondCut[2].facetAddress = address(ownershipFacet);
-        diamondCut[2].functionSelectors = new bytes4[](2);
-        diamondCut[2].functionSelectors[0] = OwnershipFacet.transferOwnership.selector;
-        diamondCut[2].functionSelectors[1] = OwnershipFacet.owner.selector;
+        // add CMCAdjudicator functions
+        diamondCut[1].facetAddress = address(adjudicator);
+        diamondCut[1].functionSelectors = new bytes4[](6);
+        diamondCut[1].functionSelectors[0] = CMCAdjudicator.getChannelDispute.selector;
+        diamondCut[1].functionSelectors[1] = CMCAdjudicator.getTransferDispute.selector;
+        diamondCut[1].functionSelectors[2] = CMCAdjudicator.disputeChannel.selector;
+        diamondCut[1].functionSelectors[3] = CMCAdjudicator.defundChannel.selector;
+        diamondCut[1].functionSelectors[4] = CMCAdjudicator.disputeTransfer.selector;
+        diamondCut[1].functionSelectors[5] = CMCAdjudicator.defundTransfer.selector;
 
         // execute non-standard internal diamondCut function to add functions
         LibDiamondCut.diamondCut(diamondCut);
 
-        // adding ERC165 data
-        // ERC165
-        ds.supportedInterfaces[IERC165.supportsInterface.selector] = true;
-
-        // DiamondCut
-        ds.supportedInterfaces[IDiamondCut.diamondCut.selector] = true;
-
-        // DiamondLoupe
-        bytes4 interfaceID = IDiamondLoupe.facets.selector ^
-            IDiamondLoupe.facetFunctionSelectors.selector ^
-            IDiamondLoupe.facetAddresses.selector ^
-            IDiamondLoupe.facetAddress.selector;
-        ds.supportedInterfaces[interfaceID] = true;
-
-        // ERC173
-        ds.supportedInterfaces[IERC173.transferOwnership.selector ^ IERC173.owner.selector] = true;
+        /// adding ERC165 data
+        /// ERC165
+        // ds.supportedInterfaces[IERC165.supportsInterface.selector] = true;
+        /// DiamondCut
+        // ds.supportedInterfaces[IDiamondCut.diamondCut.selector] = true;
     }
-    
+
     // Find facet for function that is called and execute the
     // function if a facet is found and return any value.
     fallback() external payable {
-        LibDiamondStorage.DiamondStorage storage ds;
-        bytes32 position = LibDiamondStorage.DIAMOND_STORAGE_POSITION;
+        LibFacetStorage.DiamondStorage storage ds;
+        bytes32 position = LibFacetStorage.DIAMOND_STORAGE_POSITION;
         assembly {
             ds.slot := position
         }
