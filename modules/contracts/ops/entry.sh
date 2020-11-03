@@ -20,23 +20,15 @@ mkdir -p "$data_dir" /data /tmp
 touch "$address_book"
 rm -f "$chain_addresses"
 
+dist_config="dist/hardhat.config.js"
+here_config="$cwd/hardhat.config.js"
+if [[ -f "$dist_config" && ! -f "$here_config" ]]
+then cp "$dist_config" "$here_config"
+fi
+
 if [[ "$evm" == "hardhat" ]]
 then
   echo "Using hardhat EVM"  
-  echo 'module.exports = {
-    defaultNetwork: "hardhat",
-    networks: {
-      hardhat: {
-        chainId: '"$chain_id"',
-        loggingEnabled: false,
-        accounts: [{
-          privateKey: "0xc87509a1c067bbde78beb793e6fa76530b6382a4c0241e5e4a9ec0a0f44dc0d3",
-          balance: "1000000000000000000000000000"
-        }],
-        gasPrice: 100000000000,
-      },
-    },
-  }' > /tmp/hardhat.config.js
   launch="hardhat node --config /tmp/hardhat.config.js --hostname 0.0.0.0 --port 8545"
 
 elif [[ "$evm" == "ganache" ]]
@@ -84,4 +76,4 @@ function fromAddressBook {
 
 fromAddressBook < "$address_book" > "$chain_addresses"
 
-wait $pid
+wait "$pid"
