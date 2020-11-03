@@ -22,7 +22,7 @@ then
       then exec npm run test | pino-pretty --colorize
       else exec npm run test -- "$opts" | pino-pretty --colorize
     fi
-  else 
+  else
     if [[ "$opts" == "" ]]
       then exec npm run test
       else exec npm run test -- "$opts"
@@ -70,7 +70,7 @@ then
         else (npm run test -- "$opts" | pino-pretty --colorize &)
         fi
       then (npm run test -- "$opts" | pino-pretty --colorize &)
-      else 
+      else
         if [[ "$opts" == "" ]]
         then (npm run test &)
         else (npm run test -- "$opts" &)

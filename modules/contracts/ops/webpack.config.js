@@ -7,6 +7,11 @@ module.exports = {
 
   entry: [path.join(__dirname, "../src.ts/cli.ts"), path.join(__dirname, "../src.ts/index.ts")],
 
+  externals: {
+    hardhat: "commonjs2 hardhat",
+    mocha: "commonjs2 mocha",
+  },
+
   node: {
     __filename: false,
     __dirname: false,
